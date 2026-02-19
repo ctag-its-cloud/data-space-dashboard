@@ -33,6 +33,11 @@ export class EdcClientService implements OnDestroy {
    */
   private healthCheckInterval = 30;
 
+  private _config: EdcConfig | undefined;
+  public get config(): EdcConfig | undefined {
+    return this._config;
+  }
+
   private readonly _client = new BehaviorSubject<EdcConnectorClient | undefined>(undefined);
   private readonly _isHealthy: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(false);
   readonly isHealthy$ = this._isHealthy.asObservable();
@@ -72,6 +77,7 @@ export class EdcClientService implements OnDestroy {
    * @param config.federatedCatalogUrl - (Optional) The federated catalog URL for the EDC client.
    */
   public setDashboardClient(config: EdcConfig): void {
+    this._config = config;
     this._client.next(this.createEdcConnectorClient(config));
     this.startHealthCheckJob();
 
