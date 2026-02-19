@@ -20,6 +20,7 @@ import {
   Dataset,
   EdcConnectorClientError,
   EdcConnectorClientErrorType,
+  expand,
   IdResponse,
   PolicyBuilder,
   PolicyInput,
@@ -62,7 +63,45 @@ export class CatalogService {
    * @returns A promise of IdResponse
    */
   public async initiateNegotiation(negotiationRequest: ContractNegotiationRequest): Promise<IdResponse> {
-    return (await this.edc.getClient()).management.contractNegotiations.initiate(negotiationRequest);
+    const config = this.edc.config;
+    if (!config) {
+      throw new Error('EDC configuration is missing.');
+    }
+
+    const baseUrl = config.managementUrl.endsWith('/') ? config.managementUrl.slice(0, -1) : config.managementUrl;
+    const url = `${baseUrl}/v3/contractnegotiations`;
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    if (config.apiToken) {
+      headers['x-api-key'] = config.apiToken;
+    }
+
+    const requestPolicy = { ...negotiationRequest.policy } as any;
+    delete requestPolicy.profiles;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        protocol: 'dataspace-protocol-http',
+        '@context': {
+          '@vocab': 'https://w3id.org/edc/v0.0.1/ns/',
+        },
+        counterPartyAddress: negotiationRequest.counterPartyAddress,
+        policy: requestPolicy,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      throw new Error(`Failed to initiate negotiation: ${response.status} ${response.statusText} ${errorBody}`);
+    }
+
+    return expand(await response.json(), () => new IdResponse());
+
   }
 
   /**
